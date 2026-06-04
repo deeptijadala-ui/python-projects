@@ -1,0 +1,281 @@
+import tkinter as tk
+from tkinter import messagebox
+import datetime
+import os
+
+questions = [
+    {
+        "q": "What is the full form of CPU?",
+        "options": ["Central Process Unit", "Central Processing Unit", "Computer Personal Unit", "Core Processing Unit"],
+        "ans": 1
+    },
+    {
+        "q": "Which language is known as the mother of all programming languages?",
+        "options": ["Python", "Java", "C", "Assembly"],
+        "ans": 2
+    },
+    {
+        "q": "What does HTML stand for?",
+        "options": ["Hyper Text Markup Language", "High Text Machine Language", "Hyper Transfer Markup Language", "None of these"],
+        "ans": 0
+    },
+    {
+        "q": "Which of the following is NOT a programming language?",
+        "options": ["Python", "Java", "Linux", "Swift"],
+        "ans": 2
+    },
+    {
+        "q": "What symbol is used for single line comment in Python?",
+        "options": ["//", "/*", "#", "--"],
+        "ans": 2
+    },
+    {
+        "q": "Which data structure works on LIFO principle?",
+        "options": ["Queue", "Stack", "Array", "Linked List"],
+        "ans": 1
+    },
+    {
+        "q": "What is the output of 2 ** 3 in Python?",
+        "options": ["6", "9", "8", "5"],
+        "ans": 2
+    },
+    {
+        "q": "Which keyword is used to define a function in Python?",
+        "options": ["func", "define", "def", "function"],
+        "ans": 2
+    },
+    {
+        "q": "What does RAM stand for?",
+        "options": ["Random Access Memory", "Read Access Memory", "Run Access Mode", "Random Allocated Memory"],
+        "ans": 0
+    },
+    {
+        "q": "Which of these is a valid Python list?",
+        "options": ["{1, 2, 3}", "(1, 2, 3)", "[1, 2, 3]", "<1, 2, 3>"],
+        "ans": 2
+    }
+]
+
+current_q = 0
+score = 0
+selected = None
+user_name = ""
+
+root = tk.Tk()
+root.title("Python Quiz App")
+root.geometry("620x480")
+root.resizable(False, False)
+root.config(bg="#f0f0f0")
+
+selected_option = tk.IntVar()
+
+name_frame = tk.Frame(root, bg="#f0f0f0")
+quiz_frame = tk.Frame(root, bg="#f0f0f0")
+result_frame = tk.Frame(root, bg="#f0f0f0")
+
+def show_frame(f):
+    name_frame.pack_forget()
+    quiz_frame.pack_forget()
+    result_frame.pack_forget()
+    f.pack(fill="both", expand=True)
+
+tk.Label(name_frame, text="Welcome to Quiz App", font=("Arial", 20, "bold"), bg="#f0f0f0").pack(pady=40)
+tk.Label(name_frame, text="Enter your name to begin:", font=("Arial", 12), bg="#f0f0f0").pack()
+
+name_entry = tk.Entry(name_frame, font=("Arial", 13), width=25, bd=2, relief="groove")
+name_entry.pack(pady=10)
+
+name_error = tk.Label(name_frame, text="", fg="red", bg="#f0f0f0", font=("Arial", 10))
+name_error.pack()
+
+def start_quiz():
+    global user_name, current_q, score
+    nm = name_entry.get().strip()
+    if nm == "":
+        name_error.config(text="Please enter your name first!")
+        return
+    user_name = nm
+    current_q = 0
+    score = 0
+    show_frame(quiz_frame)
+    load_question()
+
+tk.Button(name_frame, text="Start Quiz", font=("Arial", 12), bg="#4CAF50", fg="white",
+          width=15, relief="flat", cursor="hand2", command=start_quiz).pack(pady=20)
+
+top_bar = tk.Frame(quiz_frame, bg="#2196F3", pady=8)
+top_bar.pack(fill="x")
+
+q_number_label = tk.Label(top_bar, text="Question 1 of 10", font=("Arial", 11, "bold"),
+                           bg="#2196F3", fg="white")
+q_number_label.pack(side="left", padx=15)
+
+score_label = tk.Label(top_bar, text="Score: 0", font=("Arial", 11), bg="#2196F3", fg="white")
+score_label.pack(side="right", padx=15)
+
+q_text = tk.Label(quiz_frame, text="", font=("Arial", 13), bg="#f0f0f0", wraplength=560,
+                  justify="left", padx=20, pady=15)
+q_text.pack(fill="x")
+
+opts_frame = tk.Frame(quiz_frame, bg="#f0f0f0", padx=20)
+opts_frame.pack(fill="x", pady=5)
+
+rb_list = []
+for i in range(4):
+    rb = tk.Radiobutton(opts_frame, text="", variable=selected_option, value=i,
+                        font=("Arial", 11), bg="#f0f0f0", anchor="w", wraplength=500,
+                        activebackground="#e0e0e0", padx=10, pady=5)
+    rb.pack(fill="x", pady=3)
+    rb_list.append(rb)
+
+feedback_label = tk.Label(quiz_frame, text="", font=("Arial", 11, "bold"), bg="#f0f0f0")
+feedback_label.pack(pady=5)
+
+btn_frame = tk.Frame(quiz_frame, bg="#f0f0f0")
+btn_frame.pack(pady=10)
+
+next_btn = tk.Button(btn_frame, text="Next", font=("Arial", 12), bg="#2196F3", fg="white",
+                     width=12, relief="flat", cursor="hand2")
+next_btn.pack(side="right", padx=10)
+
+submit_btn = tk.Button(btn_frame, text="Submit Answer", font=("Arial", 12), bg="#FF9800", fg="white",
+                       width=14, relief="flat", cursor="hand2")
+submit_btn.pack(side="left", padx=10)
+
+answered = False
+
+def load_question():
+    global answered
+    answered = False
+    selected_option.set(-1)
+    feedback_label.config(text="")
+    next_btn.config(state="disabled")
+    submit_btn.config(state="normal")
+
+    q_number_label.config(text=f"Question {current_q + 1} of {len(questions)}")
+    score_label.config(text=f"Score: {score}")
+    q_text.config(text=f"Q{current_q + 1}. {questions[current_q]['q']}")
+
+    opts = questions[current_q]['options']
+    for i in range(4):
+        rb_list[i].config(text=f"  {chr(65+i)}.  {opts[i]}", fg="black", font=("Arial", 11))
+
+    if current_q == len(questions) - 1:
+        next_btn.config(text="Finish")
+    else:
+        next_btn.config(text="Next")
+
+def check_answer():
+    global score, answered
+    if answered:
+        return
+    picked = selected_option.get()
+    if picked == -1:
+        messagebox.showwarning("No selection", "Please select an option before submitting.")
+        return
+    answered = True
+    submit_btn.config(state="disabled")
+    correct = questions[current_q]['ans']
+    if picked == correct:
+        score += 1
+        feedback_label.config(text="Correct!", fg="green")
+        rb_list[picked].config(fg="green", font=("Arial", 11, "bold"))
+    else:
+        feedback_label.config(text=f"Wrong! Correct answer: {chr(65+correct)}", fg="red")
+        rb_list[picked].config(fg="red", font=("Arial", 11, "bold"))
+        rb_list[correct].config(fg="green", font=("Arial", 11, "bold"))
+    score_label.config(text=f"Score: {score}")
+    next_btn.config(state="normal")
+
+def next_question():
+    global current_q
+    if not answered:
+        messagebox.showwarning("Not answered", "Please submit your answer first!")
+        return
+    current_q += 1
+    if current_q >= len(questions):
+        show_result()
+    else:
+        load_question()
+
+submit_btn.config(command=check_answer)
+next_btn.config(command=next_question)
+
+def save_result(name, sc, total, percent, grade):
+    filename = "quiz_results.txt"
+    now = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    line = f"{now} | Name: {name} | Score: {sc}/{total} | Percentage: {percent}% | Grade: {grade}\n"
+    with open(filename, "a") as f:
+        f.write(line)
+
+def get_grade(p):
+    if p >= 90:
+        return "A+"
+    elif p >= 75:
+        return "A"
+    elif p >= 60:
+        return "B"
+    elif p >= 45:
+        return "C"
+    elif p >= 33:
+        return "D"
+    else:
+        return "F"
+
+def show_result():
+    show_frame(result_frame)
+    total = len(questions)
+    percent = round((score / total) * 100, 2)
+    grade = get_grade(percent)
+    save_result(user_name, score, total, percent, grade)
+
+    for widget in result_frame.winfo_children():
+        widget.destroy()
+
+    tk.Label(result_frame, text="Quiz Completed!", font=("Arial", 20, "bold"),
+             bg="#f0f0f0", fg="#333").pack(pady=30)
+
+    tk.Label(result_frame, text=f"Name: {user_name}", font=("Arial", 13), bg="#f0f0f0").pack()
+    tk.Label(result_frame, text=f"Score: {score} out of {total}", font=("Arial", 13), bg="#f0f0f0").pack(pady=5)
+    tk.Label(result_frame, text=f"Percentage: {percent}%", font=("Arial", 14, "bold"),
+             bg="#f0f0f0", fg="#2196F3").pack(pady=5)
+    tk.Label(result_frame, text=f"Grade: {grade}", font=("Arial", 16, "bold"),
+             bg="#f0f0f0", fg="#4CAF50" if grade in ["A+", "A"] else "#FF9800" if grade in ["B", "C"] else "red").pack(pady=5)
+
+    tk.Label(result_frame, text="Your result has been saved to quiz_results.txt",
+             font=("Arial", 10), bg="#f0f0f0", fg="gray").pack(pady=10)
+
+    btn_row = tk.Frame(result_frame, bg="#f0f0f0")
+    btn_row.pack(pady=20)
+
+    def play_again():
+        name_entry.delete(0, tk.END)
+        show_frame(name_frame)
+
+    tk.Button(btn_row, text="Play Again", font=("Arial", 12), bg="#4CAF50", fg="white",
+              width=13, relief="flat", cursor="hand2", command=play_again).pack(side="left", padx=10)
+
+    def view_history():
+        if not os.path.exists("quiz_results.txt"):
+            messagebox.showinfo("No History", "No results saved yet.")
+            return
+        with open("quiz_results.txt", "r") as f:
+            data = f.read()
+        popup = tk.Toplevel(root)
+        popup.title("Result History")
+        popup.geometry("650x300")
+        popup.config(bg="white")
+        tk.Label(popup, text="All Saved Results", font=("Arial", 13, "bold"), bg="white").pack(pady=10)
+        txt = tk.Text(popup, font=("Courier", 10), wrap="word", bd=0, bg="white")
+        txt.pack(fill="both", expand=True, padx=15, pady=5)
+        txt.insert("1.0", data)
+        txt.config(state="disabled")
+
+    tk.Button(btn_row, text="View History", font=("Arial", 12), bg="#9C27B0", fg="white",
+              width=13, relief="flat", cursor="hand2", command=view_history).pack(side="left", padx=10)
+
+    tk.Button(btn_row, text="Exit", font=("Arial", 12), bg="#f44336", fg="white",
+              width=10, relief="flat", cursor="hand2", command=root.destroy).pack(side="left", padx=10)
+
+show_frame(name_frame)
+root.mainloop()
