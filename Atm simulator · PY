@@ -1,0 +1,478 @@
+import tkinter as tk
+from tkinter import messagebox
+import json
+import os
+from datetime import datetime
+
+
+DATA_FILE = "accounts.json"
+
+
+def load_accounts():
+    if not os.path.exists(DATA_FILE):
+        default = {
+            "1234": {
+                "pin": "1111",
+                "name": "Rahul Sharma",
+                "balance": 15000.00,
+                "transactions": []
+            },
+            "5678": {
+                "pin": "2222",
+                "name": "Priya Mehta",
+                "balance": 8500.00,
+                "transactions": []
+            }
+        }
+        with open(DATA_FILE, "w") as f:
+            json.dump(default, f, indent=4)
+        return default
+    with open(DATA_FILE, "r") as f:
+        return json.load(f)
+
+
+def save_accounts(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+
+
+class ATMApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("SBI ATM Simulator")
+        self.root.geometry("420x560")
+        self.root.resizable(False, False)
+        self.root.configure(bg="#1a1a2e")
+
+        self.accounts = load_accounts()
+        self.current_account = None
+        self.current_card = None
+
+        self.frames = {}
+        self.build_login_screen()
+        self.build_menu_screen()
+        self.build_balance_screen()
+        self.build_deposit_screen()
+        self.build_withdraw_screen()
+        self.build_history_screen()
+
+        self.show_frame("login")
+
+    def show_frame(self, name):
+        for f in self.frames.values():
+            f.pack_forget()
+        self.frames[name].pack(fill="both", expand=True)
+
+    def header(self, parent, title):
+        top = tk.Frame(parent, bg="#16213e", pady=14)
+        top.pack(fill="x")
+        tk.Label(top, text="🏦  SBI ATM", font=("Courier", 11), bg="#16213e", fg="#a0aec0").pack()
+        tk.Label(top, text=title, font=("Courier", 18, "bold"), bg="#16213e", fg="#e2e8f0").pack()
+        tk.Frame(parent, bg="#0f3460", height=2).pack(fill="x")
+
+    def styled_button(self, parent, text, command, color="#0f3460", fg="white", width=22):
+        btn = tk.Button(
+            parent,
+            text=text,
+            command=command,
+            font=("Courier", 11, "bold"),
+            bg=color,
+            fg=fg,
+            activebackground="#e94560",
+            activeforeground="white",
+            relief="flat",
+            cursor="hand2",
+            width=width,
+            pady=8
+        )
+        return btn
+
+    def build_login_screen(self):
+        frame = tk.Frame(self.root, bg="#1a1a2e")
+        self.frames["login"] = frame
+
+        self.header(frame, "Welcome")
+
+        tk.Frame(frame, bg="#1a1a2e", height=30).pack()
+
+        tk.Label(frame, text="Please insert your card", font=("Courier", 11),
+                 bg="#1a1a2e", fg="#a0aec0").pack()
+
+        tk.Frame(frame, bg="#1a1a2e", height=20).pack()
+
+        card_frame = tk.Frame(frame, bg="#16213e", padx=30, pady=20)
+        card_frame.pack(padx=40, fill="x")
+
+        tk.Label(card_frame, text="Card Number", font=("Courier", 10),
+                 bg="#16213e", fg="#a0aec0").pack(anchor="w")
+        self.card_entry = tk.Entry(card_frame, font=("Courier", 13), width=20,
+                                   bg="#0f3460", fg="white", insertbackground="white",
+                                   relief="flat", bd=6)
+        self.card_entry.pack(fill="x", pady=(4, 14))
+
+        tk.Label(card_frame, text="PIN", font=("Courier", 10),
+                 bg="#16213e", fg="#a0aec0").pack(anchor="w")
+        self.pin_entry = tk.Entry(card_frame, font=("Courier", 13), width=20, show="●",
+                                  bg="#0f3460", fg="white", insertbackground="white",
+                                  relief="flat", bd=6)
+        self.pin_entry.pack(fill="x", pady=(4, 6))
+
+        tk.Frame(frame, bg="#1a1a2e", height=20).pack()
+
+        btn = self.styled_button(frame, "  LOGIN  →", self.do_login, color="#e94560")
+        btn.pack()
+
+        tk.Frame(frame, bg="#1a1a2e", height=30).pack()
+
+        hint = tk.Frame(frame, bg="#16213e", padx=14, pady=10)
+        hint.pack(padx=40, fill="x")
+        tk.Label(hint, text="Demo accounts:", font=("Courier", 9, "bold"),
+                 bg="#16213e", fg="#718096").pack(anchor="w")
+        tk.Label(hint, text="Card: 1234  PIN: 1111", font=("Courier", 9),
+                 bg="#16213e", fg="#718096").pack(anchor="w")
+        tk.Label(hint, text="Card: 5678  PIN: 2222", font=("Courier", 9),
+                 bg="#16213e", fg="#718096").pack(anchor="w")
+
+        self.root.bind("<Return>", lambda e: self.do_login())
+
+    def do_login(self):
+        card = self.card_entry.get().strip()
+        pin = self.pin_entry.get().strip()
+
+        if card not in self.accounts:
+            messagebox.showerror("Error", "Card number not found.")
+            return
+        if self.accounts[card]["pin"] != pin:
+            messagebox.showerror("Error", "Incorrect PIN. Please try again.")
+            self.pin_entry.delete(0, tk.END)
+            return
+
+        self.current_card = card
+        self.current_account = self.accounts[card]
+        self.card_entry.delete(0, tk.END)
+        self.pin_entry.delete(0, tk.END)
+        self.refresh_menu()
+        self.show_frame("menu")
+
+    def build_menu_screen(self):
+        frame = tk.Frame(self.root, bg="#1a1a2e")
+        self.frames["menu"] = frame
+
+        self.header(frame, "Main Menu")
+
+        self.welcome_label = tk.Label(frame, text="", font=("Courier", 12),
+                                       bg="#1a1a2e", fg="#68d391")
+        self.welcome_label.pack(pady=(18, 4))
+
+        self.date_label = tk.Label(frame, text="", font=("Courier", 9),
+                                    bg="#1a1a2e", fg="#718096")
+        self.date_label.pack(pady=(0, 18))
+
+        options = [
+            ("  💰  Balance Inquiry", "balance", "#0f3460"),
+            ("  ⬇️   Deposit", "deposit", "#0f3460"),
+            ("  ⬆️   Withdraw", "withdraw", "#0f3460"),
+            ("  📄  Transaction History", "history", "#0f3460"),
+            ("  🚪  Logout", "logout", "#c53030"),
+        ]
+
+        for label, action, color in options:
+            if action == "logout":
+                btn = self.styled_button(frame, label, self.logout, color=color)
+            else:
+                btn = self.styled_button(frame, label, lambda a=action: self.show_frame(a), color=color)
+            btn.pack(pady=5)
+
+    def refresh_menu(self):
+        name = self.current_account["name"].split()[0]
+        self.welcome_label.config(text=f"Welcome, {name}!")
+        self.date_label.config(text=datetime.now().strftime("%d %b %Y  |  %I:%M %p"))
+
+    def build_balance_screen(self):
+        frame = tk.Frame(self.root, bg="#1a1a2e")
+        self.frames["balance"] = frame
+
+        self.header(frame, "Balance Inquiry")
+
+        tk.Frame(frame, bg="#1a1a2e", height=40).pack()
+
+        self.bal_name_lbl = tk.Label(frame, text="", font=("Courier", 12),
+                                      bg="#1a1a2e", fg="#a0aec0")
+        self.bal_name_lbl.pack()
+
+        tk.Frame(frame, bg="#1a1a2e", height=10).pack()
+
+        bal_box = tk.Frame(frame, bg="#16213e", padx=40, pady=30)
+        bal_box.pack(padx=50, fill="x")
+
+        tk.Label(bal_box, text="Available Balance", font=("Courier", 10),
+                 bg="#16213e", fg="#a0aec0").pack()
+        self.bal_amount_lbl = tk.Label(bal_box, text="", font=("Courier", 26, "bold"),
+                                        bg="#16213e", fg="#68d391")
+        self.bal_amount_lbl.pack(pady=6)
+
+        tk.Frame(frame, bg="#1a1a2e", height=30).pack()
+
+        self.styled_button(frame, "← Back to Menu",
+                           lambda: self.show_frame("menu"), color="#4a5568").pack()
+
+        frame.bind("<Visibility>", lambda e: self.refresh_balance())
+
+    def refresh_balance(self):
+        if self.current_account:
+            self.bal_name_lbl.config(text=self.current_account["name"])
+            amt = self.current_account["balance"]
+            self.bal_amount_lbl.config(text=f"₹ {amt:,.2f}")
+
+    def build_deposit_screen(self):
+        frame = tk.Frame(self.root, bg="#1a1a2e")
+        self.frames["deposit"] = frame
+
+        self.header(frame, "Deposit")
+
+        tk.Frame(frame, bg="#1a1a2e", height=30).pack()
+
+        tk.Label(frame, text="Enter amount to deposit:", font=("Courier", 11),
+                 bg="#1a1a2e", fg="#a0aec0").pack()
+
+        tk.Frame(frame, bg="#1a1a2e", height=10).pack()
+
+        dep_frame = tk.Frame(frame, bg="#16213e", padx=30, pady=20)
+        dep_frame.pack(padx=40, fill="x")
+
+        tk.Label(dep_frame, text="₹  Amount", font=("Courier", 10),
+                 bg="#16213e", fg="#a0aec0").pack(anchor="w")
+        self.deposit_entry = tk.Entry(dep_frame, font=("Courier", 16), width=18,
+                                       bg="#0f3460", fg="white", insertbackground="white",
+                                       relief="flat", bd=6)
+        self.deposit_entry.pack(fill="x", pady=(4, 0))
+
+        tk.Frame(frame, bg="#1a1a2e", height=20).pack()
+
+        quick = tk.Frame(frame, bg="#1a1a2e")
+        quick.pack()
+        tk.Label(quick, text="Quick amounts:", font=("Courier", 9),
+                 bg="#1a1a2e", fg="#718096").pack()
+        qrow = tk.Frame(quick, bg="#1a1a2e")
+        qrow.pack(pady=6)
+        for amt in [500, 1000, 2000, 5000]:
+            b = tk.Button(qrow, text=f"₹{amt}", font=("Courier", 9), bg="#2d3748",
+                          fg="white", relief="flat", cursor="hand2", padx=8, pady=4,
+                          command=lambda a=amt: self.quick_fill(self.deposit_entry, a))
+            b.pack(side="left", padx=4)
+
+        tk.Frame(frame, bg="#1a1a2e", height=16).pack()
+
+        self.styled_button(frame, "  DEPOSIT  ✓", self.do_deposit, color="#276749").pack(pady=4)
+        self.styled_button(frame, "← Back to Menu",
+                           lambda: self.show_frame("menu"), color="#4a5568").pack()
+
+    def quick_fill(self, entry, amount):
+        entry.delete(0, tk.END)
+        entry.insert(0, str(amount))
+
+    def do_deposit(self):
+        try:
+            amount = float(self.deposit_entry.get())
+        except ValueError:
+            messagebox.showerror("Error", "Please enter a valid amount.")
+            return
+        if amount <= 0:
+            messagebox.showerror("Error", "Amount must be greater than zero.")
+            return
+        if amount > 100000:
+            messagebox.showerror("Error", "Maximum deposit per transaction is ₹1,00,000.")
+            return
+
+        self.current_account["balance"] += amount
+        t = {
+            "type": "Credit",
+            "amount": amount,
+            "date": datetime.now().strftime("%d-%m-%Y %H:%M"),
+            "balance_after": self.current_account["balance"]
+        }
+        self.current_account["transactions"].append(t)
+        self.accounts[self.current_card] = self.current_account
+        save_accounts(self.accounts)
+
+        self.deposit_entry.delete(0, tk.END)
+        messagebox.showinfo("Success", f"₹{amount:,.2f} deposited successfully!\n"
+                                       f"New balance: ₹{self.current_account['balance']:,.2f}")
+        self.show_frame("menu")
+
+    def build_withdraw_screen(self):
+        frame = tk.Frame(self.root, bg="#1a1a2e")
+        self.frames["withdraw"] = frame
+
+        self.header(frame, "Withdrawal")
+
+        tk.Frame(frame, bg="#1a1a2e", height=20).pack()
+
+        self.wd_bal_lbl = tk.Label(frame, text="", font=("Courier", 10),
+                                    bg="#1a1a2e", fg="#a0aec0")
+        self.wd_bal_lbl.pack()
+
+        tk.Frame(frame, bg="#1a1a2e", height=10).pack()
+
+        wd_frame = tk.Frame(frame, bg="#16213e", padx=30, pady=20)
+        wd_frame.pack(padx=40, fill="x")
+
+        tk.Label(wd_frame, text="₹  Amount to Withdraw", font=("Courier", 10),
+                 bg="#16213e", fg="#a0aec0").pack(anchor="w")
+        self.withdraw_entry = tk.Entry(wd_frame, font=("Courier", 16), width=18,
+                                        bg="#0f3460", fg="white", insertbackground="white",
+                                        relief="flat", bd=6)
+        self.withdraw_entry.pack(fill="x", pady=(4, 0))
+
+        tk.Frame(frame, bg="#1a1a2e", height=16).pack()
+
+        quick = tk.Frame(frame, bg="#1a1a2e")
+        quick.pack()
+        tk.Label(quick, text="Quick amounts:", font=("Courier", 9),
+                 bg="#1a1a2e", fg="#718096").pack()
+        qrow = tk.Frame(quick, bg="#1a1a2e")
+        qrow.pack(pady=6)
+        for amt in [500, 1000, 2000, 5000]:
+            b = tk.Button(qrow, text=f"₹{amt}", font=("Courier", 9), bg="#2d3748",
+                          fg="white", relief="flat", cursor="hand2", padx=8, pady=4,
+                          command=lambda a=amt: self.quick_fill(self.withdraw_entry, a))
+            b.pack(side="left", padx=4)
+
+        tk.Frame(frame, bg="#1a1a2e", height=16).pack()
+
+        self.styled_button(frame, "  WITHDRAW  ✓", self.do_withdraw, color="#c53030").pack(pady=4)
+        self.styled_button(frame, "← Back to Menu",
+                           lambda: self.show_frame("menu"), color="#4a5568").pack()
+
+        frame.bind("<Visibility>", lambda e: self.refresh_withdraw())
+
+    def refresh_withdraw(self):
+        if self.current_account:
+            bal = self.current_account["balance"]
+            self.wd_bal_lbl.config(text=f"Available: ₹{bal:,.2f}")
+
+    def do_withdraw(self):
+        try:
+            amount = float(self.withdraw_entry.get())
+        except ValueError:
+            messagebox.showerror("Error", "Please enter a valid amount.")
+            return
+        if amount <= 0:
+            messagebox.showerror("Error", "Amount must be greater than zero.")
+            return
+        if amount % 100 != 0:
+            messagebox.showerror("Error", "Amount must be in multiples of ₹100.")
+            return
+        if amount > self.current_account["balance"]:
+            messagebox.showerror("Error", "Insufficient balance.")
+            return
+        if amount > 25000:
+            messagebox.showerror("Error", "Maximum withdrawal per transaction is ₹25,000.")
+            return
+
+        self.current_account["balance"] -= amount
+        t = {
+            "type": "Debit",
+            "amount": amount,
+            "date": datetime.now().strftime("%d-%m-%Y %H:%M"),
+            "balance_after": self.current_account["balance"]
+        }
+        self.current_account["transactions"].append(t)
+        self.accounts[self.current_card] = self.current_account
+        save_accounts(self.accounts)
+
+        self.withdraw_entry.delete(0, tk.END)
+        messagebox.showinfo("Success", f"₹{amount:,.2f} dispensed!\n"
+                                       f"Remaining balance: ₹{self.current_account['balance']:,.2f}\n\n"
+                                       f"Please collect your cash.")
+        self.show_frame("menu")
+
+    def build_history_screen(self):
+        frame = tk.Frame(self.root, bg="#1a1a2e")
+        self.frames["history"] = frame
+
+        self.header(frame, "Mini Statement")
+
+        tk.Frame(frame, bg="#1a1a2e", height=8).pack()
+
+        top_bar = tk.Frame(frame, bg="#1a1a2e")
+        top_bar.pack(fill="x", padx=20)
+        self.hist_name_lbl = tk.Label(top_bar, text="", font=("Courier", 10),
+                                       bg="#1a1a2e", fg="#a0aec0")
+        self.hist_name_lbl.pack(side="left")
+        self.hist_bal_lbl = tk.Label(top_bar, text="", font=("Courier", 10, "bold"),
+                                      bg="#1a1a2e", fg="#68d391")
+        self.hist_bal_lbl.pack(side="right")
+
+        tk.Frame(frame, bg="#0f3460", height=1).pack(fill="x", padx=20, pady=6)
+
+        list_frame = tk.Frame(frame, bg="#16213e")
+        list_frame.pack(fill="both", expand=True, padx=20)
+
+        scrollbar = tk.Scrollbar(list_frame)
+        scrollbar.pack(side="right", fill="y")
+
+        self.history_listbox = tk.Listbox(
+            list_frame,
+            font=("Courier", 9),
+            bg="#16213e",
+            fg="#e2e8f0",
+            selectbackground="#0f3460",
+            relief="flat",
+            bd=0,
+            yscrollcommand=scrollbar.set,
+            activestyle="none"
+        )
+        self.history_listbox.pack(fill="both", expand=True)
+        scrollbar.config(command=self.history_listbox.yview)
+
+        tk.Frame(frame, bg="#1a1a2e", height=8).pack()
+
+        self.styled_button(frame, "← Back to Menu",
+                           lambda: self.show_frame("menu"), color="#4a5568").pack(pady=4)
+
+        frame.bind("<Visibility>", lambda e: self.refresh_history())
+
+    def refresh_history(self):
+        if not self.current_account:
+            return
+
+        self.hist_name_lbl.config(text=self.current_account["name"])
+        self.hist_bal_lbl.config(text=f"₹{self.current_account['balance']:,.2f}")
+
+        self.history_listbox.delete(0, tk.END)
+        txns = self.current_account["transactions"]
+
+        if not txns:
+            self.history_listbox.insert(tk.END, "  No transactions yet.")
+            return
+
+        self.history_listbox.insert(tk.END, "  Date           Type    Amount")
+        self.history_listbox.insert(tk.END, "  " + "-" * 36)
+
+        for t in reversed(txns[-10:]):
+            sign = "+" if t["type"] == "Credit" else "-"
+            line = f"  {t['date']}  {t['type']:<7}  {sign}₹{t['amount']:>8,.0f}"
+            self.history_listbox.insert(tk.END, line)
+            if t["type"] == "Credit":
+                idx = self.history_listbox.size() - 1
+                self.history_listbox.itemconfig(idx, fg="#68d391")
+            else:
+                idx = self.history_listbox.size() - 1
+                self.history_listbox.itemconfig(idx, fg="#fc8181")
+
+        self.history_listbox.insert(tk.END, "  " + "-" * 36)
+        self.history_listbox.insert(tk.END, f"  Showing last {min(10, len(txns))} transactions")
+
+    def logout(self):
+        confirm = messagebox.askyesno("Logout", "Are you sure you want to logout?")
+        if confirm:
+            self.current_account = None
+            self.current_card = None
+            self.show_frame("login")
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = ATMApp(root)
+    root.mainloop()
