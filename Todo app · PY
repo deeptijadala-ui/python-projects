@@ -1,0 +1,142 @@
+import tkinter as tk
+from tkinter import messagebox
+import csv
+import os
+
+FILENAME = "tasks.csv"
+
+def load_tasks():
+    tasks = []
+    if os.path.exists(FILENAME):
+        with open(FILENAME, "r") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) == 2:
+                    tasks.append({"task": row[0], "done": row[1]})
+    return tasks
+
+def save_tasks(tasks):
+    with open(FILENAME, "w", newline="") as f:
+        writer = csv.writer(f)
+        for t in tasks:
+            writer.writerow([t["task"], t["done"]])
+
+def refresh_list():
+    listbox.delete(0, tk.END)
+    for i, t in enumerate(task_list):
+        status = "[Done] " if t["done"] == "yes" else "[ ]    "
+        listbox.insert(tk.END, status + t["task"])
+        try:
+            if t["done"] == "yes":
+                listbox.itemconfig(i, foreground="gray")
+            else:
+                listbox.itemconfig(i, foreground="black")
+        except tk.TclError:
+            pass
+
+def add_task():
+    text = entry.get().strip()
+    if text == "":
+        messagebox.showwarning("Warning", "Please enter a task.")
+        return
+    task_list.append({"task": text, "done": "no"})
+    save_tasks(task_list)
+    entry.delete(0, tk.END)
+    refresh_list()
+
+def delete_task():
+    selected = listbox.curselection()
+    if not selected:
+        messagebox.showwarning("Warning", "Please select a task to delete.")
+        return
+    index = selected[0]
+    confirm = messagebox.askyesno("Confirm", "Delete this task?")
+    if confirm:
+        task_list.pop(index)
+        save_tasks(task_list)
+        refresh_list()
+
+def mark_done():
+    selected = listbox.curselection()
+    if not selected:
+        messagebox.showwarning("Warning", "Please select a task.")
+        return
+    index = selected[0]
+    if task_list[index]["done"] == "yes":
+        task_list[index]["done"] = "no"
+    else:
+        task_list[index]["done"] = "yes"
+    save_tasks(task_list)
+    refresh_list()
+
+def update_task():
+    selected = listbox.curselection()
+    if not selected:
+        messagebox.showwarning("Warning", "Please select a task to update.")
+        return
+    index = selected[0]
+    new_text = entry.get().strip()
+    if new_text == "":
+        messagebox.showwarning("Warning", "Please type the updated task in the input box.")
+        return
+    task_list[index]["task"] = new_text
+    save_tasks(task_list)
+    entry.delete(0, tk.END)
+    refresh_list()
+
+def on_select(event):
+    selected = listbox.curselection()
+    if selected:
+        index = selected[0]
+        entry.delete(0, tk.END)
+        entry.insert(0, task_list[index]["task"])
+
+task_list = load_tasks()
+
+window = tk.Tk()
+window.title("My To-Do List")
+window.geometry("480x500")
+window.resizable(False, False)
+window.configure(bg="#f0f0f0")
+
+tk.Label(window, text="To-Do List App", font=("Arial", 16, "bold"), bg="#f0f0f0").pack(pady=10)
+
+frame_input = tk.Frame(window, bg="#f0f0f0")
+frame_input.pack(pady=5)
+
+entry = tk.Entry(frame_input, width=35, font=("Arial", 11))
+entry.pack(side=tk.LEFT, padx=5)
+
+tk.Button(frame_input, text="Add", width=8, bg="#4CAF50", fg="white",
+          font=("Arial", 10), command=add_task).pack(side=tk.LEFT)
+
+listbox_frame = tk.Frame(window)
+listbox_frame.pack(pady=10)
+
+scrollbar = tk.Scrollbar(listbox_frame)
+scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+listbox = tk.Listbox(listbox_frame, width=52, height=14, font=("Arial", 11),
+                     yscrollcommand=scrollbar.set, selectbackground="#c0d8f5")
+listbox.pack(side=tk.LEFT)
+listbox.bind("<<ListboxSelect>>", on_select)
+
+scrollbar.config(command=listbox.yview)
+
+frame_buttons = tk.Frame(window, bg="#f0f0f0")
+frame_buttons.pack(pady=8)
+
+tk.Button(frame_buttons, text="Mark Done / Undo", width=16, bg="#2196F3", fg="white",
+          font=("Arial", 10), command=mark_done).grid(row=0, column=0, padx=6)
+
+tk.Button(frame_buttons, text="Update Task", width=14, bg="#FF9800", fg="white",
+          font=("Arial", 10), command=update_task).grid(row=0, column=1, padx=6)
+
+tk.Button(frame_buttons, text="Delete Task", width=14, bg="#f44336", fg="white",
+          font=("Arial", 10), command=delete_task).grid(row=0, column=2, padx=6)
+
+tk.Label(window, text="Click a task to load it into the input box for editing.",
+         font=("Arial", 9), bg="#f0f0f0", fg="#777").pack()
+
+refresh_list()
+window.mainloop()
